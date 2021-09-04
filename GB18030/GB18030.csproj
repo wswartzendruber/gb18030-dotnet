@@ -2,6 +2,15 @@
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="gb-18030-2000.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="gb-18030-2000.xml" />
+  </ItemGroup>
 
 </Project>
