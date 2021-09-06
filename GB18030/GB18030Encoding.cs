@@ -41,6 +41,10 @@ namespace GB18030
 
         private readonly static ReadOnlyDictionary<(byte, byte, byte, byte), Rune> FourByteCodePoints;
 
+        private readonly static ReadOnlyDictionary<Rune, (byte, byte)> CodePointsTwoBytes;
+
+        private readonly static ReadOnlyDictionary<Rune, (byte, byte, byte, byte)> CodePointsFourBytes;
+
         private readonly static ReadOnlyCollection<Range> Ranges;
 
         static GB18030Encoding()
@@ -57,6 +61,8 @@ namespace GB18030
                     ?? throw new XmlException("Could not locate internal character map's range element.");
                 var twoByteCodePoints = new Dictionary<(byte, byte), Rune>();
                 var fourByteCodePoints = new Dictionary<(byte, byte, byte, byte), Rune>();
+                var codePointsTwoBytes = new Dictionary<Rune, (byte, byte)>();
+                var codePointsFourBytes = new Dictionary<Rune, (byte, byte, byte, byte)>();
                 var rangeList = new List<Range>();
 
                 foreach (XmlNode assignmentNode in assignmentNodes)
@@ -71,18 +77,22 @@ namespace GB18030
                         case 1:
                             continue;
                         case 2:
-                            twoByteCodePoints[(
+                            var bytes2 = (
                                 System.Convert.ToByte(byteStringArray[0], 16),
                                 System.Convert.ToByte(byteStringArray[1], 16)
-                            )] = new Rune(codePoint);
+                            );
+                            twoByteCodePoints[bytes2] = new Rune(codePoint);
+                            codePointsTwoBytes[new Rune(codePoint)] = bytes2;
                             break;
                         case 4:
-                            fourByteCodePoints[(
+                            var bytes4 = (
                                 System.Convert.ToByte(byteStringArray[0], 16),
                                 System.Convert.ToByte(byteStringArray[1], 16),
                                 System.Convert.ToByte(byteStringArray[2], 16),
                                 System.Convert.ToByte(byteStringArray[3], 16)
-                            )] = new Rune(codePoint);
+                            );
+                            fourByteCodePoints[bytes4] = new Rune(codePoint);
+                            codePointsFourBytes[new Rune(codePoint)] = bytes4;
                             break;
                         default:
                             throw new XmlException("Internal XML contains invalid byte sequence.");
@@ -91,6 +101,8 @@ namespace GB18030
 
                 TwoByteCodePoints = new ReadOnlyDictionary<(byte, byte), Rune>(twoByteCodePoints);
                 FourByteCodePoints = new ReadOnlyDictionary<(byte, byte, byte, byte), Rune>(fourByteCodePoints);
+                CodePointsTwoBytes = new ReadOnlyDictionary<Rune, (byte, byte)>(codePointsTwoBytes);
+                CodePointsFourBytes = new ReadOnlyDictionary<Rune, (byte, byte, byte, byte)>(codePointsFourBytes);
 
                 foreach (XmlNode rangeNode in rangeNodes)
                 {
@@ -133,6 +145,35 @@ namespace GB18030
 
         public override int GetBytes(char[] chars, int charIndex, int charCount, byte[] bytes, int byteIndex)
         {
+            var byteCount = 0;
+            var charLimit = charIndex + charCount;
+
+            while (charIndex < charLimit) {
+
+                var highChar = chars[charIndex++];
+
+                if (Char.IsHighSurrogate(highChar))
+                {
+                    if (charIndex < charLimit)
+                    {
+                        var lowChar = chars[charIndex++];
+
+                        if (Char.IsLowSurrogate(lowChar))
+                        {
+
+                        }
+                        else
+                        {
+                            DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                        }
+                    }
+                    else
+                    {
+                        DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                    }
+                }
+            }
+
             throw new NotImplementedException();
         }
 
@@ -145,7 +186,7 @@ namespace GB18030
             {
                 var firstByte = bytes[index++];
 
-                if (0x00 <= firstByte && firstByte <= 0x7F)
+                if (firstByte >> 7 == 0)
                 {
                     //
                     // 1 byte - US-ASCII
@@ -183,9 +224,7 @@ namespace GB18030
 
                         if (index + 1 < limit)
                         {
-                            var thirdByte = bytes[index++];
-                            var fourthByte = bytes[index++];
-                            var codePoint = CalculatedCodePoint((firstByte, secondByte, thirdByte, fourthByte));
+                            var codePoint = CalculatedCodePoint((firstByte, secondByte, bytes[index++], bytes[index++]));
 
                             if (codePoint.HasValue)
                             {
@@ -224,7 +263,7 @@ namespace GB18030
             {
                 var firstByte = bytes[byteIndex++];
 
-                if (0x00 <= firstByte && firstByte <= 0x7F)
+                if (firstByte >> 7 == 0)
                 {
                     //
                     // 1 byte - US-ASCII
@@ -246,23 +285,10 @@ namespace GB18030
                         // 2 bytes
                         //
 
-                        if (secondByte == 0x7F)
-                        {
-                            // 0x7F may not appear here.
-                            DecoderFallback.CreateFallbackBuffer().GetNextChar();
-                            continue;
-                        }
-
-                        var twoBytes = (firstByte, secondByte);
-
-                        if (!TwoByteCodePoints.ContainsKey(twoBytes))
-                        {
-                            // These two bytes don't resolve to any known thing.
-                            DecoderFallback.CreateFallbackBuffer().GetNextChar();
-                            continue;
-                        }
-
-                        charIndex += TwoByteCodePoints[twoBytes].EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
+                        charIndex += (
+                            TwoByteCodePoints.GetOrNull((firstByte, secondByte))
+                            ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                        ).EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                     }
                     else if (0x30 <= secondByte && secondByte <= 0x39)
                     {
@@ -273,16 +299,12 @@ namespace GB18030
                         if (byteIndex + 1 < byteLimit)
                         {
                             var fourBytes = (firstByte, secondByte, bytes[byteIndex++], bytes[byteIndex++]);
-                            var codePoint = FourByteCodePoints.ContainsKey(fourBytes) switch
-                            {
-                                true => FourByteCodePoints[fourBytes],
-                                false => CalculatedCodePoint(fourBytes),
-                            };
 
-                            if (codePoint.HasValue)
-                                charIndex += codePoint.Value.EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
-                            else
-                                chars[charIndex++] = DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                            charIndex += (
+                                FourByteCodePoints.GetOrNull(fourBytes)
+                                ?? CalculatedCodePoint(fourBytes)
+                                ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                            ).EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                         }
                         else
                         {
