@@ -11,8 +11,8 @@ namespace GB18030
     {
         private readonly struct Range
         {
-            public readonly int FirstValue;
-            public readonly int LastValue;
+            public readonly Rune FirstValue;
+            public readonly Rune LastValue;
             public readonly (byte, byte, byte, byte) FirstBytes;
             public readonly (byte, byte, byte, byte) LastBytes;
             public readonly (byte, byte, byte, byte) MinBytes;
@@ -20,8 +20,8 @@ namespace GB18030
 
             public Range
             (
-                int firstValue,
-                int lastValue,
+                Rune firstValue,
+                Rune lastValue,
                 (byte, byte, byte, byte) firstBytes,
                 (byte, byte, byte, byte) lastBytes,
                 (byte, byte, byte, byte) minBytes,
@@ -37,34 +37,34 @@ namespace GB18030
             }
         }
 
-        private readonly static ReadOnlyDictionary<(byte, byte), int> TwoByteCodePoints;
+        private readonly static ReadOnlyDictionary<(byte, byte), Rune> TwoByteCodePoints;
 
-        private readonly static ReadOnlyDictionary<(byte, byte, byte, byte), int> FourByteCodePoints;
+        private readonly static ReadOnlyDictionary<(byte, byte, byte, byte), Rune> FourByteCodePoints;
 
         private readonly static ReadOnlyCollection<Range> Ranges;
 
         static GB18030Encoding()
         {
             using (var xmlStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GB18030.gb-18030-2000.xml")
-                ?? throw new Exception("Could not load internal XML mapping file."))
+                ?? throw new Exception("Could not load internal character map."))
             {
                 var xdocument = new XmlDocument(); xdocument.Load(xmlStream);
                 var xelement = xdocument.DocumentElement
-                    ?? throw new XmlException("Could not load root element in internal XML document.");
+                    ?? throw new XmlException("Could not load internal character map's root element.");
                 var assignmentNodes = xelement.SelectNodes("//characterMapping/assignments/a")
-                    ?? throw new XmlException("Could not locate internal character assignments.");
+                    ?? throw new XmlException("Could not locate internal character map's assignments element.");
                 var rangeNodes = xelement.SelectNodes("//characterMapping/assignments/range")
-                    ?? throw new XmlException("Could not locate internal character ranges.");
-                var twoByteCodePoints = new Dictionary<(byte, byte), int>();
-                var fourByteCodePoints = new Dictionary<(byte, byte, byte, byte), int>();
+                    ?? throw new XmlException("Could not locate internal character map's range element.");
+                var twoByteCodePoints = new Dictionary<(byte, byte), Rune>();
+                var fourByteCodePoints = new Dictionary<(byte, byte, byte, byte), Rune>();
                 var rangeList = new List<Range>();
 
                 foreach (XmlNode assignmentNode in assignmentNodes)
                 {
                     var byteStringArray = assignmentNode?.Attributes?["b"]?.Value?.Split(' ')
-                        ?? throw new XmlException("Could not read byte sequence from internal character mapping.");
+                        ?? throw new XmlException("Could not read assignment's byte sequence from internal character map.");
                     var codePoint = System.Convert.ToInt32(assignmentNode?.Attributes?["u"]?.Value
-                        ?? throw new XmlException("Could not read Unicode code point from internal character mapping."), 16);
+                        ?? throw new XmlException("Could not read assignment's code point from internal character map."), 16);
 
                     switch (byteStringArray.Length)
                     {
@@ -74,7 +74,7 @@ namespace GB18030
                             twoByteCodePoints[(
                                 System.Convert.ToByte(byteStringArray[0], 16),
                                 System.Convert.ToByte(byteStringArray[1], 16)
-                            )] = codePoint;
+                            )] = new Rune(codePoint);
                             break;
                         case 4:
                             fourByteCodePoints[(
@@ -82,31 +82,31 @@ namespace GB18030
                                 System.Convert.ToByte(byteStringArray[1], 16),
                                 System.Convert.ToByte(byteStringArray[2], 16),
                                 System.Convert.ToByte(byteStringArray[3], 16)
-                            )] = codePoint;
+                            )] = new Rune(codePoint);
                             break;
                         default:
-                            throw new Exception("Internal XML contains invalid byte sequence.");
+                            throw new XmlException("Internal XML contains invalid byte sequence.");
                     }
                 }
 
-                TwoByteCodePoints = new ReadOnlyDictionary<(byte, byte), int>(twoByteCodePoints);
-                FourByteCodePoints = new ReadOnlyDictionary<(byte, byte, byte, byte), int>(fourByteCodePoints);
+                TwoByteCodePoints = new ReadOnlyDictionary<(byte, byte), Rune>(twoByteCodePoints);
+                FourByteCodePoints = new ReadOnlyDictionary<(byte, byte, byte, byte), Rune>(fourByteCodePoints);
 
                 foreach (XmlNode rangeNode in rangeNodes)
                 {
                     rangeList.Add(new Range(
-                        System.Convert.ToInt32(rangeNode?.Attributes?["uFirst"]?.Value
-                            ?? throw new XmlException("First Unicode code point cannot be read from internal character mapping assignment."), 16),
-                        System.Convert.ToInt32(rangeNode?.Attributes?["uLast"]?.Value
-                            ?? throw new XmlException("Last Unicode code point cannot be read from internal character mapping assignment."), 16),
+                        new Rune(System.Convert.ToInt32(rangeNode?.Attributes?["uFirst"]?.Value
+                            ?? throw new XmlException("Could not read range's first code point from internal character map."), 16)),
+                        new Rune(System.Convert.ToInt32(rangeNode?.Attributes?["uLast"]?.Value
+                            ?? throw new XmlException("Could not read range's last code point from internal character map."), 16)),
                         ByteStringToBytes(rangeNode?.Attributes?["bFirst"]?.Value
-                            ?? throw new XmlException("First byte sequence cannot be read from internal character mapping assignment.")),
+                            ?? throw new XmlException("Could not read range's first byte sequence from internal character map.")),
                         ByteStringToBytes(rangeNode?.Attributes?["bLast"]?.Value
-                            ?? throw new XmlException("Last byte sequence cannot be read from internal character mapping assignment.")),
+                            ?? throw new XmlException("Could not read range's last byte sequence from internal character map.")),
                         ByteStringToBytes(rangeNode?.Attributes?["bMin"]?.Value
-                            ?? throw new XmlException("Minimum byte sequence cannot be read from internal character mapping assignment.")),
+                            ?? throw new XmlException("Could not read range's minimum byte sequence from internal character map.")),
                         ByteStringToBytes(rangeNode?.Attributes?["bMax"]?.Value
-                            ?? throw new XmlException("Maximum byte sequence cannot be read from internal character mapping assignment."))
+                            ?? throw new XmlException("Could not read range's maximum byte sequence from internal character map."))
                     ));
                 }
 
@@ -189,7 +189,7 @@ namespace GB18030
 
                             if (codePoint.HasValue)
                             {
-                                charCount += Utf16CharSize(codePoint.Value);
+                                charCount += codePoint.Value.Utf16SequenceLength;
                             }
                             else
                             {
@@ -262,7 +262,7 @@ namespace GB18030
                             continue;
                         }
 
-                        charIndex += WriteUtf16CodePoint(chars, charIndex, TwoByteCodePoints[twoBytes]);
+                        charIndex += TwoByteCodePoints[twoBytes].EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                     }
                     else if (0x30 <= secondByte && secondByte <= 0x39)
                     {
@@ -280,7 +280,7 @@ namespace GB18030
                             };
 
                             if (codePoint.HasValue)
-                                charIndex += WriteUtf16CodePoint(chars, charIndex, codePoint.Value);
+                                charIndex += codePoint.Value.EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                             else
                                 chars[charIndex++] = DecoderFallback.CreateFallbackBuffer().GetNextChar();
                         }
@@ -307,52 +307,25 @@ namespace GB18030
             throw new NotImplementedException();
         }
 
-        private int WriteUtf16CodePoint(char[] chars, int charIndex, int codePoint)
-        {
-            if (0x010000 <= codePoint && codePoint <= 0x10FFFF)
-            {
-                var ncp = codePoint - 0x10000;
-
-                chars[charIndex++] = (char)(0xD800 + (ncp >> 10));
-                chars[charIndex] = (char)(0xDC00 + (ncp & 0x3FF));
-
-                return 2;
-            }
-            else
-            {
-                chars[charIndex] = (char)codePoint;
-
-                return 1;
-            }
-        }
-
-        private int Utf16CharSize(int codePoint)
-        {
-            if (0x010000 <= codePoint && codePoint <= 0x10FFFF)
-                return 2;
-            else
-                return 1;
-        }
-
-        private int? CalculatedCodePoint((byte, byte, byte, byte) bytes)
+        private Rune? CalculatedCodePoint((byte, byte, byte, byte) bytes)
         {
             int linear = Linear(bytes);
 
             foreach (var range in Ranges)
             {
                 if (Linear(range.FirstBytes) <= linear && linear <= Linear(range.LastBytes))
-                    return range.FirstValue + (linear - Linear(range.FirstBytes));
+                    return new Rune(range.FirstValue.Value + (linear - Linear(range.FirstBytes)));
             }
 
             return null;
         }
 
-        private (byte, byte, byte, byte)? CalculatedFourBytes(int codePoint)
+        private (byte, byte, byte, byte)? CalculatedFourBytes(Rune codePoint)
         {
             foreach (var range in Ranges)
             {
                 if (range.FirstValue <= codePoint && codePoint <= range.LastValue)
-                    return Unlinear(Linear(range.FirstBytes) + codePoint - range.FirstValue);
+                    return Unlinear(Linear(range.FirstBytes) + codePoint.Value - range.FirstValue.Value);
             }
 
             return null;
