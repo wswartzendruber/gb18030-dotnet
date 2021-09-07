@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Text;
-using System.Xml;
 
 namespace GB18030
 {
@@ -174,13 +173,10 @@ namespace GB18030
                         // 2 bytes
                         //
 
-                        if (secondByte == 0x7F)
-                        {
-                            // 0x7F may not appear here.
-                            DecoderFallback.CreateFallbackBuffer().GetNextChar();
-                        }
-
-                        charCount++;
+                        charCount += (
+                            TwoByteCodePoints.GetOrNull((firstByte, secondByte))
+                            ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                        ).Utf16SequenceLength;
                     }
                     else if (0x30 <= secondByte && secondByte <= 0x39)
                     {
@@ -190,17 +186,13 @@ namespace GB18030
 
                         if (index + 1 < limit)
                         {
-                            var codePoint = CalculatedCodePoint((firstByte, secondByte, bytes[index++], bytes[index++]));
+                            var fourBytes = (firstByte, secondByte, bytes[index++], bytes[index++]);
 
-                            if (codePoint.HasValue)
-                            {
-                                charCount += codePoint.Value.Utf16SequenceLength;
-                            }
-                            else
-                            {
-                                DecoderFallback.CreateFallbackBuffer().GetNextChar();
-                                charCount++;
-                            }
+                            charCount += (
+                                FourByteCodePoints.GetOrNull(fourBytes)
+                                ?? CalculatedCodePoint(fourBytes)
+                                ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                            ).Utf16SequenceLength;
                         }
                         else
                         {
