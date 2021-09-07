@@ -6,11 +6,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="gb-18030-2000.xml" />
+    <None Remove="FourByteCodePoints.bin" />
+    <None Remove="TwoByteCodePoints.bin" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="gb-18030-2000.xml" />
+    <EmbeddedResource Include="FourByteCodePoints.bin" />
+    <EmbeddedResource Include="TwoByteCodePoints.bin" />
   </ItemGroup>
 
 </Project>
