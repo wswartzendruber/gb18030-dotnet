@@ -79,6 +79,7 @@ namespace GB18030
                     var bytes = (buffer[3], buffer[4]);
                     
                     twoByteCodePoints[bytes] = codePoint;
+                    codePointTwoBytes[codePoint] = bytes;
                 }
 
                 TwoByteCodePoints = new(twoByteCodePoints);
@@ -98,6 +99,7 @@ namespace GB18030
                     var bytes = (buffer[3], buffer[4], buffer[5], buffer[6]);
 
                     fourByteCodePoints[bytes] = codePoint;
+                    codePointFourBytes[codePoint] = bytes;
                 }
 
                 FourByteCodePoints = new(fourByteCodePoints);
@@ -359,6 +361,7 @@ namespace GB18030
                     return Unlinear(Linear(range.FirstBytes) + codePoint.Value - range.FirstValue.Value);
             }
 
+            Console.WriteLine("CP: " + codePoint.Value);
             throw new InvalidOperationException("Byte sequence could not be calculated.");
         }
 
