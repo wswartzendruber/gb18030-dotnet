@@ -112,7 +112,7 @@ namespace GB18030
             var byteCount = 0;
             var charSpan = new ReadOnlySpan<char>(chars, index, count);
 
-            foreach (Rune codePoint in charSpan)
+            foreach (Rune codePoint in charSpan.EnumerateRunes())
             {
                 if (codePoint.IsAscii)
                 {
@@ -148,7 +148,7 @@ namespace GB18030
             var charSpan = new ReadOnlySpan<char>(chars, charIndex, charCount);
             var byteStart = byteIndex;
 
-            foreach (Rune codePoint in charSpan)
+            foreach (Rune codePoint in charSpan.EnumerateRunes())
             {
                 if (codePoint.IsAscii)
                 {
