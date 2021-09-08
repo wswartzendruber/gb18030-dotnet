@@ -60,6 +60,8 @@ namespace GB18030
             new Range(new Rune(0x10000), new Rune(0x10FFFF), (0x90, 0x30, 0x81, 0x30), (0xE3, 0x32, 0x9A, 0x35), (0x81, 0x30, 0x81, 0x30), (0xFE, 0x39, 0xFE, 0x39))
         });
 
+        private readonly static (byte, byte, byte, byte) FallbackBytes = (0x84, 0x31, 0xA4, 0x37);
+
         static GB18030Encoding()
         {
             var assembly = Assembly.GetExecutingAssembly();
@@ -105,41 +107,83 @@ namespace GB18030
 
         public override int GetByteCount(char[] chars, int index, int count)
         {
-            throw new NotImplementedException();
+            var byteCount = 0;
+            var charSpan = new ReadOnlySpan<char>(chars, index, count);
+
+            foreach (Rune codePoint in charSpan)
+            {
+                if (codePoint.IsAscii)
+                {
+                    //
+                    // 1 byte - US-ASCII
+                    //
+
+                    byteCount++;
+                }
+                else if (CodePointTwoBytes.ContainsKey(codePoint))
+                {
+                    //
+                    // 2 bytes
+                    //
+
+                    byteCount += 2;
+                }
+                else
+                {
+                    //
+                    // 4 bytes
+                    //
+
+                    byteCount += 4;
+                }
+            }
+
+            return byteCount;
         }
 
         public override int GetBytes(char[] chars, int charIndex, int charCount, byte[] bytes, int byteIndex)
         {
-            var byteCount = 0;
-            var charLimit = charIndex + charCount;
+            var charSpan = new ReadOnlySpan<char>(chars, charIndex, charCount);
+            var byteStart = byteIndex;
 
-            while (charIndex < charLimit) {
-
-                var highChar = chars[charIndex++];
-
-                if (Char.IsHighSurrogate(highChar))
+            foreach (Rune codePoint in charSpan)
+            {
+                if (codePoint.IsAscii)
                 {
-                    if (charIndex < charLimit)
-                    {
-                        var lowChar = chars[charIndex++];
+                    //
+                    // 1 byte - US-ASCII
+                    //
 
-                        if (Char.IsLowSurrogate(lowChar))
-                        {
+                    bytes[byteIndex++] = (byte)codePoint.Value;
+                }
+                else if (CodePointTwoBytes.ContainsKey(codePoint))
+                {
+                    //
+                    // 2 bytes
+                    //
 
-                        }
-                        else
-                        {
-                            DecoderFallback.CreateFallbackBuffer().GetNextChar();
-                        }
-                    }
-                    else
-                    {
-                        DecoderFallback.CreateFallbackBuffer().GetNextChar();
-                    }
+                    var twoBytes = CodePointTwoBytes[codePoint];
+
+                    bytes[byteIndex++] = twoBytes.Item1;
+                    bytes[byteIndex++] = twoBytes.Item2;
+                }
+                else
+                {
+                    //
+                    // 4 bytes
+                    //
+
+                    var fourBytes = CodePointFourBytes.GetOrNull(codePoint)
+                        ?? CalculatedFourBytes(codePoint);
+
+                    bytes[byteIndex++] = fourBytes.Item1;
+                    bytes[byteIndex++] = fourBytes.Item2;
+                    bytes[byteIndex++] = fourBytes.Item3;
+                    bytes[byteIndex++] = fourBytes.Item4;
                 }
             }
 
-            throw new NotImplementedException();
+            return byteIndex - byteStart;
         }
 
         public override int GetCharCount(byte[] bytes, int index, int count)
@@ -282,9 +326,16 @@ namespace GB18030
 
         public override int GetMaxByteCount(int charCount) => 4 * charCount;
 
-        public override int GetMaxCharCount(int byteCount)
+        public override int GetMaxCharCount(int byteCount) => byteCount;
+
+        private int SendFallbackBytes(byte[] bytes, int byteIndex)
         {
-            throw new NotImplementedException();
+            bytes[byteIndex] = FallbackBytes.Item1;
+            bytes[byteIndex + 1] = FallbackBytes.Item1;
+            bytes[byteIndex + 2] = FallbackBytes.Item1;
+            bytes[byteIndex + 3] = FallbackBytes.Item1;
+
+            return 4;
         }
 
         private Rune? CalculatedCodePoint((byte, byte, byte, byte) bytes)
@@ -300,7 +351,7 @@ namespace GB18030
             return null;
         }
 
-        private (byte, byte, byte, byte)? CalculatedFourBytes(Rune codePoint)
+        private (byte, byte, byte, byte) CalculatedFourBytes(Rune codePoint)
         {
             foreach (var range in Ranges)
             {
@@ -308,7 +359,7 @@ namespace GB18030
                     return Unlinear(Linear(range.FirstBytes) + codePoint.Value - range.FirstValue.Value);
             }
 
-            return null;
+            throw new InvalidOperationException("Byte sequence could not be calculated.");
         }
 
         private (byte, byte, byte, byte) Unlinear(int linear)
