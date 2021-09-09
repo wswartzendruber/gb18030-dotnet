@@ -1,4 +1,10 @@
-﻿using System;
+﻿/*
+ * SPDX-FileCopyrightText: 2021 William Swartzendruber <wswartzendruber@gmail.com>
+ *
+ * SPDX-License-Identifier: CC0-1.0
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
