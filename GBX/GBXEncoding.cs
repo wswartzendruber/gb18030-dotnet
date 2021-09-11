@@ -31,7 +31,7 @@ namespace GBX
 
                 for (int bytesRead = mapStream.Read(buffer); bytesRead == 5; bytesRead = mapStream.Read(buffer))
                 {
-                    var codePoint = new Rune((int)buffer[0] << 16 | (int)buffer[1] << 8 | (int)buffer[2]);
+                    var codePoint = new Rune(buffer[0] << 16 | buffer[1] << 8 | buffer[2]);
                     var bytes = (buffer[3], buffer[4]);
                     
                     twoByteCodePoints[bytes] = codePoint;
@@ -171,10 +171,10 @@ namespace GBX
 
                             if (fourBytes.Item3 >> 5 == 1 && fourBytes.Item4 >> 5 == 1)
                             {
-                                var value = (int)(fourBytes.Item1 & 0b01111111) << 14
-                                    | (int)(fourBytes.Item2 & 0b00011111) << 10
-                                    | (int)(fourBytes.Item3 & 0b00011111) << 5
-                                    | (int)(fourBytes.Item4 & 0b00011111);
+                                var value = (fourBytes.Item1 & 0b01111111) << 14
+                                    | (fourBytes.Item2 & 0b00011111) << 10
+                                    | (fourBytes.Item3 & 0b00011111) << 5
+                                    | (fourBytes.Item4 & 0b00011111);
 
                                 if (Rune.IsValid(value))
                                 {

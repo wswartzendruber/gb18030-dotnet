@@ -73,7 +73,7 @@ namespace GB18030
 
                 for (int bytesRead = mapStream.Read(buffer); bytesRead == 5; bytesRead = mapStream.Read(buffer))
                 {
-                    var codePoint = new Rune((int)buffer[0] << 16 | (int)buffer[1] << 8 | (int)buffer[2]);
+                    var codePoint = new Rune(buffer[0] << 16 | buffer[1] << 8 | buffer[2]);
                     var bytes = (buffer[3], buffer[4]);
                     
                     twoByteCodePoints[bytes] = codePoint;
@@ -93,7 +93,7 @@ namespace GB18030
 
                 for (int bytesRead = mapStream.Read(buffer); bytesRead == 7; bytesRead = mapStream.Read(buffer))
                 {
-                    var codePoint = new Rune((int)buffer[0] << 16 | (int)buffer[1] << 8 | (int)buffer[2]);
+                    var codePoint = new Rune(buffer[0] << 16 | buffer[1] << 8 | buffer[2]);
                     var bytes = (buffer[3], buffer[4], buffer[5], buffer[6]);
 
                     fourByteCodePoints[bytes] = codePoint;
