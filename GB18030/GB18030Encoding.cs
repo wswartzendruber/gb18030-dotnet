@@ -219,7 +219,7 @@ namespace GB18030
 
                         charCount += (
                             TwoByteCodePoints.GetOrNull((firstByte, secondByte))
-                            ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                            ?? new Rune(NextReplacementChar())
                         ).Utf16SequenceLength;
                     }
                     else if (0x30 <= secondByte && secondByte <= 0x39)
@@ -235,20 +235,20 @@ namespace GB18030
                             charCount += (
                                 FourByteCodePoints.GetOrNull(fourBytes)
                                 ?? CalculatedCodePoint(fourBytes)
-                                ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                                ?? new Rune(NextReplacementChar())
                             ).Utf16SequenceLength;
                         }
                         else
                         {
                             index = limit;
-                            DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                            NextReplacementChar();
                             charCount++;
                         }
                     }
                 }
                 else
                 {
-                    DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                    NextReplacementChar();
                     charCount++;
                 }
             }
@@ -289,7 +289,7 @@ namespace GB18030
 
                         charIndex += (
                             TwoByteCodePoints.GetOrNull((firstByte, secondByte))
-                            ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                            ?? new Rune(NextReplacementChar())
                         ).EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                     }
                     else if (0x30 <= secondByte && secondByte <= 0x39)
@@ -305,19 +305,19 @@ namespace GB18030
                             charIndex += (
                                 FourByteCodePoints.GetOrNull(fourBytes)
                                 ?? CalculatedCodePoint(fourBytes)
-                                ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                                ?? new Rune(NextReplacementChar())
                             ).EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                         }
                         else
                         {
                             byteIndex = byteLimit;
-                            chars[charIndex++] = DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                            chars[charIndex++] = NextReplacementChar();
                         }
                     }
                 }
                 else
                 {
-                    chars[charIndex++] = DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                    chars[charIndex++] = NextReplacementChar();
                 }
             }
 
@@ -327,6 +327,8 @@ namespace GB18030
         public override int GetMaxByteCount(int charCount) => 4 * charCount;
 
         public override int GetMaxCharCount(int byteCount) => byteCount;
+
+        private char NextReplacementChar() => DecoderFallback.CreateFallbackBuffer().GetNextChar();
 
         private Rune? CalculatedCodePoint((byte, byte, byte, byte) bytes)
         {
