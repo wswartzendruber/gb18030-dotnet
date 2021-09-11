@@ -140,7 +140,7 @@ namespace GBX
 
                     charCount++;
                 }
-                else if (0x81 <= firstByte && firstByte <= 0xFE && index < limit)
+                else if (firstByte >> 7 == 1 && index < limit)
                 {
                     //
                     // 2 or 4 bytes
@@ -156,7 +156,7 @@ namespace GBX
 
                         charCount += (
                             TwoByteCodePoints.GetOrNull((firstByte, secondByte))
-                            ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                            ?? new Rune(NextReplacementChar())
                         ).Utf16SequenceLength;
                     }
                     else if (secondByte >> 5 == 1)
@@ -185,14 +185,14 @@ namespace GBX
                                 else
                                 {
                                     charCount += (
-                                        new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                                        new Rune(NextReplacementChar())
                                     ).Utf16SequenceLength;
                                 }
                             }
                             else
                             {
                                 charCount += (
-                                    new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                                    new Rune(NextReplacementChar())
                                 ).Utf16SequenceLength;
                             }
 
@@ -200,14 +200,14 @@ namespace GBX
                         else
                         {
                             index = limit;
-                            DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                            NextReplacementChar();
                             charCount++;
                         }
                     }
                 }
                 else
                 {
-                    DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                    NextReplacementChar();
                     charCount++;
                 }
             }
@@ -232,7 +232,7 @@ namespace GBX
                     
                     chars[charIndex++] = (char)firstByte;
                 }
-                else if (0x81 <= firstByte && firstByte <= 0xFE && byteIndex < byteLimit)
+                else if (firstByte >> 7 == 1 && byteIndex < byteLimit)
                 {
                     //
                     // 2 or 4 bytes
@@ -248,7 +248,7 @@ namespace GBX
 
                         charIndex += (
                             TwoByteCodePoints.GetOrNull((firstByte, secondByte))
-                            ?? new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                            ?? new Rune(NextReplacementChar())
                         ).EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                     }
                     else if (secondByte >> 5 == 1)
@@ -263,10 +263,10 @@ namespace GBX
 
                             if (fourBytes.Item3 >> 5 == 1 && fourBytes.Item4 >> 5 == 1)
                             {
-                                var value = (int)(fourBytes.Item1 & 0b01111111) << 14
-                                    | (int)(fourBytes.Item2 & 0b00011111) << 10
-                                    | (int)(fourBytes.Item3 & 0b00011111) << 5
-                                    | (int)(fourBytes.Item4 & 0b00011111);
+                                var value = (fourBytes.Item1 & 0b01111111) << 14
+                                    | (fourBytes.Item2 & 0b00011111) << 10
+                                    | (fourBytes.Item3 & 0b00011111) << 5
+                                    | (fourBytes.Item4 & 0b00011111);
 
                                 if (Rune.IsValid(value))
                                 {
@@ -277,14 +277,14 @@ namespace GBX
                                 else
                                 {
                                     charIndex += (
-                                        new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                                        new Rune(NextReplacementChar())
                                     ).EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                                 }
                             }
                             else
                             {
                                 charIndex += (
-                                    new Rune(DecoderFallback.CreateFallbackBuffer().GetNextChar())
+                                    new Rune(NextReplacementChar())
                                 ).EncodeToUtf16(new Span<char>(chars, charIndex, chars.Length - charIndex));
                             }
 
@@ -292,13 +292,13 @@ namespace GBX
                         else
                         {
                             byteIndex = byteLimit;
-                            chars[charIndex++] = DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                            chars[charIndex++] = NextReplacementChar();
                         }
                     }
                 }
                 else
                 {
-                    chars[charIndex++] = DecoderFallback.CreateFallbackBuffer().GetNextChar();
+                    chars[charIndex++] = NextReplacementChar();
                 }
             }
 
@@ -308,5 +308,7 @@ namespace GBX
         public override int GetMaxByteCount(int charCount) => 4 * charCount;
 
         public override int GetMaxCharCount(int byteCount) => byteCount;
+
+        private char NextReplacementChar() => DecoderFallback.CreateFallbackBuffer().GetNextChar();
     }
 }
